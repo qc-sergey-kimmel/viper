@@ -1,4 +1,4 @@
-// Package viper provide gozix viper bundle.
+// Package viper provide viper bundle.
 package viper
 
 import (

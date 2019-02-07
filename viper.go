@@ -1,10 +1,14 @@
+// Package viper provide gozix viper bundle.
 package viper
 
 import (
+	"os"
 	"strings"
 
 	"github.com/gozix/glue"
 	"github.com/sarulabs/di"
+	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 )
 
@@ -26,8 +30,13 @@ type (
 	optionFunc func(bundle *Bundle)
 )
 
-// BundleName is default definition name.
-const BundleName = "viper"
+const (
+	// BundleName is default definition name.
+	BundleName = "viper"
+
+	// DefConfigFlag is config persistent flag name.
+	DefConfigFlag = "cli.persistent_flags.config"
+)
 
 // NewBundle create bundle instance.
 func NewBundle() *Bundle {
@@ -109,24 +118,52 @@ func (b *Bundle) Name() string {
 
 // Build implements the glue.Bundle interface.
 func (b *Bundle) Build(builder *di.Builder) error {
-	return builder.Add(di.Def{
-		Name: BundleName,
-		Build: func(ctn di.Container) (_ interface{}, err error) {
-			var registry glue.Registry
-			if err = ctn.Fill(glue.DefRegistry, &registry); err != nil {
-				return nil, err
-			}
+	return builder.Add(
+		di.Def{
+			Name: BundleName,
+			Build: func(ctn di.Container) (_ interface{}, err error) {
+				var registry glue.Registry
+				if err = ctn.Fill(glue.DefRegistry, &registry); err != nil {
+					return nil, err
+				}
 
-			var path string
-			if err = registry.Fill("app.path", &path); err != nil {
-				return nil, err
-			}
+				var path string
+				if err = registry.Fill("app.path", &path); err != nil {
+					return nil, err
+				}
 
-			b.viper.AddConfigPath(path)
+				b.viper.AddConfigPath(path)
 
-			return b.viper, b.viper.ReadInConfig()
+				var cmd *cobra.Command
+				if err = registry.Fill("cli.cmd", &cmd); err != nil {
+					return nil, err
+				}
+
+				var configFile string
+				if configFile, err = cmd.Flags().GetString("config"); err != nil {
+					return nil, err
+				}
+
+				if len(configFile) > 0 {
+					b.viper.SetConfigFile(configFile)
+				}
+
+				return b.viper, b.viper.ReadInConfig()
+			},
 		},
-	})
+		di.Def{
+			Name: DefConfigFlag,
+			Tags: []di.Tag{{
+				Name: glue.TagRootPersistentFlags,
+			}},
+			Build: func(_ di.Container) (i interface{}, e error) {
+				var flagSet = pflag.NewFlagSet(os.Args[0], pflag.ExitOnError)
+				flagSet.StringP("config", "c", "", "config file")
+
+				return flagSet, nil
+			},
+		},
+	)
 }
 
 // apply implements Option.

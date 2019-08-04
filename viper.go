@@ -5,8 +5,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/gozix/glue"
-	"github.com/sarulabs/di"
+	"github.com/gozix/glue/v2"
+	"github.com/sarulabs/di/v2"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"

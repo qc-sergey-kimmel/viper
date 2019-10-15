@@ -2,6 +2,8 @@
 package viper
 
 import (
+	"context"
+	"errors"
 	"os"
 	"strings"
 
@@ -28,6 +30,14 @@ type (
 
 	// optionFunc wraps a func so it satisfies the Option interface.
 	optionFunc func(bundle *Bundle)
+)
+
+var (
+	// ErrUndefinedAppPath is error, triggered when app.path is undefined in current context.
+	ErrUndefinedAppPath = errors.New("app.path is undefined")
+
+	// ErrUndefinedCliCmd is error, triggered when cli.cmd is undefined in current context.
+	ErrUndefinedCliCmd = errors.New("cli.cmd is undefined")
 )
 
 const (
@@ -122,21 +132,21 @@ func (b *Bundle) Build(builder *di.Builder) error {
 		di.Def{
 			Name: BundleName,
 			Build: func(ctn di.Container) (_ interface{}, err error) {
-				var registry glue.Registry
-				if err = ctn.Fill(glue.DefRegistry, &registry); err != nil {
+				var ctx context.Context
+				if err = ctn.Fill(glue.DefContext, &ctx); err != nil {
 					return nil, err
 				}
 
-				var path string
-				if err = registry.Fill("app.path", &path); err != nil {
-					return nil, err
+				var path, ok = ctx.Value("app.path").(string)
+				if !ok {
+					return nil, ErrUndefinedAppPath
 				}
 
 				b.viper.AddConfigPath(path)
 
 				var cmd *cobra.Command
-				if err = registry.Fill("cli.cmd", &cmd); err != nil {
-					return nil, err
+				if cmd, ok = ctx.Value("cli.cmd").(*cobra.Command); !ok {
+					return nil, ErrUndefinedCliCmd
 				}
 
 				var configFile string

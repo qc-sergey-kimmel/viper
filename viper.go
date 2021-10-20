@@ -49,14 +49,18 @@ const (
 )
 
 // NewBundle create bundle instance.
-func NewBundle() *Bundle {
-	return NewBundleWithConfig(
+func NewBundle(options ...Option) *Bundle {
+	var opts = []Option{
 		AutomaticEnv(),
 		EnvPrefix("ENV"),
 		EnvKeyReplacer(strings.NewReplacer(".", "_")),
 		ConfigName("config"),
 		ConfigType("json"),
-	)
+	}
+
+	opts = append(opts, options...)
+
+	return NewBundleWithConfig(opts...)
 }
 
 // NewBundleWithConfig create bundle instance with config.

@@ -1,15 +1,17 @@
+// Copyright 2018 Sergey Novichkov. All rights reserved.
+// For the full copyright and license information, please view the LICENSE
+// file that was distributed with this source code.
+
 // Package viper provide viper bundle.
 package viper
 
 import (
 	"context"
 	"errors"
-	"os"
 	"strings"
 
-	"github.com/gozix/glue/v2"
-	"github.com/sarulabs/di/v2"
-	"github.com/spf13/cobra"
+	"github.com/gozix/di"
+	"github.com/gozix/glue/v3"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 )
@@ -25,27 +27,19 @@ type (
 		viper *viper.Viper
 	}
 
-	// Viper is type alias of viper.Viper
-	Viper = viper.Viper
-
-	// optionFunc wraps a func so it satisfies the Option interface.
+	// optionFunc wraps a func, so it satisfies the Option interface.
 	optionFunc func(bundle *Bundle)
 )
 
-var (
-	// ErrUndefinedAppPath is error, triggered when app.path is undefined in current context.
-	ErrUndefinedAppPath = errors.New("app.path is undefined")
-
-	// ErrUndefinedCliCmd is error, triggered when cli.cmd is undefined in current context.
-	ErrUndefinedCliCmd = errors.New("cli.cmd is undefined")
-)
+// ErrUndefinedAppPath is error, triggered when app.path is undefined in current context.
+var ErrUndefinedAppPath = errors.New("app.path is undefined")
 
 const (
 	// BundleName is default definition name.
 	BundleName = "viper"
 
-	// DefConfigFlag is config persistent flag name.
-	DefConfigFlag = "cli.persistent_flags.config"
+	// tagViperFlagSet is tag marks bundle flag set.
+	tagViperFlagSet = "viper.flag_set"
 )
 
 // NewBundle create bundle instance.
@@ -131,53 +125,43 @@ func (b *Bundle) Name() string {
 }
 
 // Build implements the glue.Bundle interface.
-func (b *Bundle) Build(builder *di.Builder) error {
-	return builder.Add(
-		di.Def{
-			Name: BundleName,
-			Build: func(ctn di.Container) (_ interface{}, err error) {
-				var ctx context.Context
-				if err = ctn.Fill(glue.DefContext, &ctx); err != nil {
-					return nil, err
-				}
-
-				var path, ok = ctx.Value("app.path").(string)
-				if !ok {
-					return nil, ErrUndefinedAppPath
-				}
-
-				b.viper.AddConfigPath(path)
-
-				var cmd *cobra.Command
-				if cmd, ok = ctx.Value("cli.cmd").(*cobra.Command); !ok {
-					return nil, ErrUndefinedCliCmd
-				}
-
-				var configFile string
-				if configFile, err = cmd.Flags().GetString("config"); err != nil {
-					return nil, err
-				}
-
-				if len(configFile) > 0 {
-					b.viper.SetConfigFile(configFile)
-				}
-
-				return b.viper, b.viper.ReadInConfig()
-			},
-		},
-		di.Def{
-			Name: DefConfigFlag,
-			Tags: []di.Tag{{
-				Name: glue.TagRootPersistentFlags,
-			}},
-			Build: func(_ di.Container) (i interface{}, e error) {
-				var flagSet = pflag.NewFlagSet(os.Args[0], pflag.ExitOnError)
-				flagSet.StringP("config", "c", "", "config file")
-
-				return flagSet, nil
-			},
-		},
+func (b *Bundle) Build(builder di.Builder) error {
+	return builder.Apply(
+		di.Provide(
+			b.provideViper,
+			di.Constraint(1, di.WithTags(tagViperFlagSet)),
+		),
+		di.Provide(b.provideFlagSet, glue.AsPersistentFlags(), di.Tags{{
+			Name: tagViperFlagSet,
+		}}),
 	)
+}
+
+func (b *Bundle) provideViper(ctx context.Context, flagSet *pflag.FlagSet) (_ *viper.Viper, err error) {
+	var path, ok = ctx.Value("app.path").(string)
+	if !ok {
+		return nil, ErrUndefinedAppPath
+	}
+
+	b.viper.AddConfigPath(path)
+
+	var configFile string
+	if configFile, err = flagSet.GetString("config"); err != nil {
+		return nil, err
+	}
+
+	if len(configFile) > 0 {
+		b.viper.SetConfigFile(configFile)
+	}
+
+	return b.viper, b.viper.ReadInConfig()
+}
+
+func (b *Bundle) provideFlagSet() *pflag.FlagSet {
+	var flagSet = pflag.NewFlagSet(BundleName, pflag.ExitOnError)
+	flagSet.StringP("config", "c", "", "config file")
+
+	return flagSet
 }
 
 // apply implements Option.

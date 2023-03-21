@@ -8,6 +8,7 @@ package viper
 import (
 	"context"
 	"errors"
+	"os"
 	"strings"
 
 	"github.com/gozix/di"
@@ -157,11 +158,11 @@ func (b *Bundle) provideViper(ctx context.Context, flagSet *pflag.FlagSet) (_ *v
 	return b.viper, b.viper.ReadInConfig()
 }
 
-func (b *Bundle) provideFlagSet() *pflag.FlagSet {
-	var flagSet = pflag.NewFlagSet(BundleName, pflag.ExitOnError)
+func (b *Bundle) provideFlagSet() (*pflag.FlagSet, error) {
+	var flagSet = pflag.NewFlagSet(BundleName, pflag.ContinueOnError)
 	flagSet.StringP("config", "c", "", "config file")
 
-	return flagSet
+	return flagSet, flagSet.Parse(os.Args)
 }
 
 // apply implements Option.

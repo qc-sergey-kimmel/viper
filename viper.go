@@ -162,7 +162,12 @@ func (b *Bundle) provideFlagSet() (*pflag.FlagSet, error) {
 	var flagSet = pflag.NewFlagSet(BundleName, pflag.ContinueOnError)
 	flagSet.StringP("config", "c", "", "config file")
 
-	return flagSet, flagSet.Parse(os.Args)
+	var err = flagSet.Parse(os.Args)
+	if errors.Is(err, pflag.ErrHelp) {
+		err = nil
+	}
+
+	return flagSet, err
 }
 
 // apply implements Option.

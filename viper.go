@@ -8,6 +8,7 @@ package viper
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"strings"
 
@@ -148,14 +149,20 @@ func (b *Bundle) provideViper(ctx context.Context, flagSet *pflag.FlagSet) (_ *v
 
 	var configFile string
 	if configFile, err = flagSet.GetString("config"); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("unable to get config flag value: %w", err)
 	}
 
 	if len(configFile) > 0 {
 		b.viper.SetConfigFile(configFile)
 	}
 
-	return b.viper, b.viper.ReadInConfig()
+	err = b.viper.ReadInConfig()
+	if err != nil {
+		return nil, fmt.Errorf("unable to read config file: '%s' : %w",
+			configFile, err)
+	}
+
+	return b.viper, nil
 }
 
 func (b *Bundle) provideFlagSet() (*pflag.FlagSet, error) {

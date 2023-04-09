@@ -149,7 +149,7 @@ func (b *Bundle) provideViper(ctx context.Context, flagSet *pflag.FlagSet) (_ *v
 
 	var configFile string
 	if configFile, err = flagSet.GetString("config"); err != nil {
-		return nil, fmt.Errorf("unable to get config flag value: %w", err)
+		return nil, fmt.Errorf("unable to get config flag value : %w", err)
 	}
 
 	if len(configFile) > 0 {
@@ -158,7 +158,7 @@ func (b *Bundle) provideViper(ctx context.Context, flagSet *pflag.FlagSet) (_ *v
 
 	err = b.viper.ReadInConfig()
 	if err != nil {
-		return nil, fmt.Errorf("unable to read config file: '%s' : %w",
+		return nil, fmt.Errorf("unable to read config file : '%s' : %w",
 			configFile, err)
 	}
 

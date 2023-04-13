@@ -168,6 +168,7 @@ func (b *Bundle) provideViper(ctx context.Context, flagSet *pflag.FlagSet) (_ *v
 func (b *Bundle) provideFlagSet() (*pflag.FlagSet, error) {
 	var flagSet = pflag.NewFlagSet(BundleName, pflag.ContinueOnError)
 	flagSet.StringP("config", "c", "", "config file")
+	flagSet.ParseErrorsWhitelist.UnknownFlags = true
 
 	var err = flagSet.Parse(os.Args)
 	if errors.Is(err, pflag.ErrHelp) {

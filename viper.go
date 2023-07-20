@@ -26,7 +26,8 @@ type (
 
 	// Bundle implements the glue.Bundle interface.
 	Bundle struct {
-		viper *viper.Viper
+		viper             *viper.Viper
+		dontUseConfigFile bool
 	}
 
 	// optionFunc wraps a func, so it satisfies the Option interface.
@@ -121,6 +122,20 @@ func ConfigType(value string) Option {
 	})
 }
 
+// DontUseConfigFile option disables config file reading.
+func DontUseConfigFile() Option {
+	return optionFunc(func(bundle *Bundle) {
+		bundle.dontUseConfigFile = true
+	})
+}
+
+// Default option sets default value for key in viper instance.
+func Default(key string, value interface{}) Option {
+	return optionFunc(func(bundle *Bundle) {
+		bundle.viper.SetDefault(key, value)
+	})
+}
+
 // Name implements the glue.Bundle interface.
 func (b *Bundle) Name() string {
 	return BundleName
@@ -140,26 +155,28 @@ func (b *Bundle) Build(builder di.Builder) error {
 }
 
 func (b *Bundle) provideViper(ctx context.Context, flagSet *pflag.FlagSet) (_ *viper.Viper, err error) {
-	var path, ok = ctx.Value("app.path").(string)
-	if !ok {
-		return nil, ErrUndefinedAppPath
-	}
+	if !b.dontUseConfigFile {
+		var path, ok = ctx.Value("app.path").(string)
+		if !ok {
+			return nil, ErrUndefinedAppPath
+		}
 
-	b.viper.AddConfigPath(path)
+		b.viper.AddConfigPath(path)
 
-	var configFile string
-	if configFile, err = flagSet.GetString("config"); err != nil {
-		return nil, fmt.Errorf("unable to get config flag value : %w", err)
-	}
+		var configFile string
+		if configFile, err = flagSet.GetString("config"); err != nil {
+			return nil, fmt.Errorf("unable to get config flag value : %w", err)
+		}
 
-	if len(configFile) > 0 {
-		b.viper.SetConfigFile(configFile)
-	}
+		if len(configFile) > 0 {
+			b.viper.SetConfigFile(configFile)
+		}
 
-	err = b.viper.ReadInConfig()
-	if err != nil {
-		return nil, fmt.Errorf("unable to read config file : '%s' : %w",
-			configFile, err)
+		err = b.viper.ReadInConfig()
+		if err != nil {
+			return nil, fmt.Errorf("unable to read config file : '%s' : %w",
+				configFile, err)
+		}
 	}
 
 	return b.viper, nil
@@ -167,7 +184,11 @@ func (b *Bundle) provideViper(ctx context.Context, flagSet *pflag.FlagSet) (_ *v
 
 func (b *Bundle) provideFlagSet() (*pflag.FlagSet, error) {
 	var flagSet = pflag.NewFlagSet(BundleName, pflag.ContinueOnError)
-	flagSet.StringP("config", "c", "", "config file")
+
+	if !b.dontUseConfigFile {
+		flagSet.StringP("config", "c", "", "config file")
+	}
+
 	flagSet.ParseErrorsWhitelist.UnknownFlags = true
 
 	var err = flagSet.Parse(os.Args)
